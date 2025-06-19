@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Kasir - Warung Makan</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 15px;
+      background: #f2f2f2;
+    }
+    h2, h3 {
+      text-align: center;
+    }
+    input, button, select {
+      width: 100%;
+      padding: 10px;
+      margin: 5px 0;
+      font-size: 16px;
+    }
+    .item-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 4px 0;
+    }
+    .struk {
+      background: white;
+      padding: 10px;
+      margin-top: 15px;
+      border: 1px dashed black;
+    }
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      .struk, .struk * {
+        visibility: visible;
+      }
+      .struk {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Kasir</h2>
+  <h3>Warung Makan</h3>
+
+  <input type="text" id="draftName" placeholder="Nama Pelanggan / ID Draft">
+  <button onclick="simpanDraft()">💾 Simpan Draft</button>
+
+  <select id="draftSelect" onchange="loadDraftAuto()">
+    <option value="">-- Pilih Draft Pelanggan --</option>
+  </select>
+  <button onclick="hapusDraft()">🗑️ Hapus Draft</button>
+
+  <hr>
+
+  <input type="text" id="itemName" placeholder="Nama Item">
+  <input type="number" id="itemPrice" placeholder="Harga Satuan (Rp)">
+  <input type="number" id="itemQty" placeholder="Jumlah">
+  <button onclick="tambahItem()">+ Tambah Item</button>
+
+  <div class="struk" id="struk">
+    <h3>Struk Pesanan</h3>
+    <p id="tanggal"></p>
+    <hr>
+    <div id="itemList"></div>
+    <hr>
+    <div class="item-row"><strong>Subtotal:</strong><span id="subtotal">Rp0</span></div>
+    <div class="item-row"><strong>Uang Tunai:</strong><span id="cash">Rp0</span></div>
+    <div class="item-row"><strong>Kembalian:</strong><span id="change">Rp0</span></div>
+  </div>
+
+  <input type="number" id="cashInput" placeholder="Masukkan Uang Tunai">
+  <button onclick="hitungKembalian()">Hitung Kembalian</button>
+  <button onclick="cetakStruk()">🖨️ Cetak Struk</button>
+  <button onclick="resetPesanan()">Reset / Selesai</button>
+
+  <script>
+    let items = [];
+
+    const rupiah = (angka) => "Rp" + angka.toLocaleString("id-ID");
+
+    function updateTanggal() {
+      const now = new Date();
+      document.getElementById("tanggal").innerText =
+        now.toLocaleDateString("id-ID") + " " + now.toLocaleTimeString("id-ID");
+    }
+
+    function tampilkanStruk() {
+      const list = document.getElementById("itemList");
+      list.innerHTML = "";
+      let total = 0;
+
+      items.forEach((item) => {
+        const line = document.createElement("div");
+        line.className = "item-row";
+        const totalItem = item.price * item.qty;
+        total += totalItem;
+        line.innerHTML = `<span>${item.qty}x ${item.name}</span><span>${rupiah(totalItem)}</span>`;
+        list.appendChild(line);
+      });
+
+      document.getElementById("subtotal").innerText = rupiah(total);
+      return total;
+    }
+
+    function tambahItem() {
+      const name = document.getElementById("itemName").value.trim();
+      const price = parseInt(document.getElementById("itemPrice").value);
+      const qty = parseInt(document.getElementById("itemQty").value);
+
+      if (!name || isNaN(price) || isNaN(qty)) {
+        alert("Isi semua kolom item dengan benar!");
+        return;
+      }
+
+      items.push({ name, price, qty });
+      tampilkanStruk();
+      simpanOtomatis();
+      document.getElementById("itemName").value = "";
+      document.getElementById("itemPrice").value = "";
+      document.getElementById("itemQty").value = "";
+    }
+
+    function hitungKembalian() {
+      const cash = parseInt(document.getElementById("cashInput").value);
+      const total = tampilkanStruk();
+
+      if (isNaN(cash) || cash < total) {
+        alert("Uang tidak cukup atau belum diisi.");
+        return;
+      }
+
+      document.getElementById("cash").innerText = rupiah(cash);
+      document.getElementById("change").innerText = rupiah(cash - total);
+    }
+
+    function resetPesanan() {
+      if (confirm("Selesaikan dan hapus semua pesanan?")) {
+        items = [];
+        tampilkanStruk();
+        document.getElementById("cash").innerText = "Rp0";
+        document.getElementById("change").innerText = "Rp0";
+        document.getElementById("cashInput").value = "";
+      }
+    }
+
+    function simpanDraft() {
+      const namaDraft = document.getElementById("draftName").value.trim();
+      if (!namaDraft) {
+        alert("Masukkan nama draft atau nama pelanggan!");
+        return;
+      }
+
+      let allDrafts = JSON.parse(localStorage.getItem("allDrafts") || "{}");
+      allDrafts[namaDraft] = items;
+      localStorage.setItem("allDrafts", JSON.stringify(allDrafts));
+      alert("Draft disimpan!");
+      muatDaftarDraft();
+    }
+
+    function simpanOtomatis() {
+      const namaDraft = document.getElementById("draftSelect").value;
+      if (!namaDraft) return;
+      let allDrafts = JSON.parse(localStorage.getItem("allDrafts") || "{}");
+      allDrafts[namaDraft] = items;
+      localStorage.setItem("allDrafts", JSON.stringify(allDrafts));
+    }
+
+    function loadDraftAuto() {
+      const namaDraft = document.getElementById("draftSelect").value;
+      if (!namaDraft) return;
+      let allDrafts = JSON.parse(localStorage.getItem("allDrafts") || "{}");
+      items = allDrafts[namaDraft] || [];
+      tampilkanStruk();
+      document.getElementById("draftName").value = namaDraft;
+    }
+
+    function hapusDraft() {
+      const namaDraft = document.getElementById("draftSelect").value;
+      if (!namaDraft) {
+        alert("Pilih draft yang ingin dihapus!");
+        return;
+      }
+
+      if (confirm("Yakin ingin menghapus draft ini?")) {
+        let allDrafts = JSON.parse(localStorage.getItem("allDrafts") || "{}");
+        delete allDrafts[namaDraft];
+        localStorage.setItem("allDrafts", JSON.stringify(allDrafts));
+        muatDaftarDraft();
+        alert("Draft dihapus!");
+      }
+    }
+
+    function cetakStruk() {
+      window.print();
+    }
+
+    function muatDaftarDraft() {
+      const select = document.getElementById("draftSelect");
+      select.innerHTML = `<option value="">-- Pilih Draft Pelanggan --</option>`;
+      let allDrafts = JSON.parse(localStorage.getItem("allDrafts") || "{}");
+      for (const key in allDrafts) {
+        const opt = document.createElement("option");
+        opt.value = key;
+        opt.text = key;
+        select.appendChild(opt);
+      }
+    }
+
+    updateTanggal();
+    muatDaftarDraft();
+    tampilkanStruk();
+  </script>
+
+</body>
+</html>
